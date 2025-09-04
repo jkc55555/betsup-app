@@ -1,0 +1,174 @@
+require_relative '../node_modules/react-native/scripts/react_native_pods'
+require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
+
+platform :ios, '12.4'
+install! 'cocoapods', :deterministic_uuids => false
+
+target 'BetBuddies' do
+  config = use_native_modules!
+
+  # Flags change depending on the env values.
+  flags = get_default_flags()
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    # Hermes is now enabled by default. Disable by setting this flag to false.
+    # Upcoming versions of React Native may rely on get_default_flags(), but
+    # we make it explicit here to aid in the React Native upgrade process.
+    :hermes_enabled => flags[:hermes_enabled],
+    :fabric_enabled => flags[:fabric_enabled],
+    # Enables Flipper.
+    #
+    # Note that if you have use_frameworks! enabled, Flipper will not work and
+    # you should disable the next line.
+    :flipper_configuration => FlipperConfiguration.enabled,
+    # An absolute path to your application root.
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
+
+  # React Native Firebase
+  pod 'Firebase', :modular_headers => true
+  pod 'FirebaseCoreInternal', :modular_headers => true
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'FirebaseCore', :modular_headers => true
+  pod 'FirebaseAuth', :modular_headers => true
+  pod 'FirebaseFirestore', :modular_headers => true
+  pod 'FirebaseFunctions', :modular_headers => true
+  pod 'FirebaseStorage', :modular_headers => true
+  pod 'FirebaseMessaging', :modular_headers => true
+  pod 'FirebaseAnalytics', :modular_headers => true
+  pod 'FirebaseCrashlytics', :modular_headers => true
+  pod 'FirebasePerformance', :modular_headers => true
+
+  # Facebook SDK
+  pod 'FBSDKCoreKit', '~> 14.1'
+  pod 'FBSDKLoginKit', '~> 14.1'
+  pod 'FBSDKShareKit', '~> 14.1'
+
+  # Google Sign-In
+  pod 'GoogleSignIn', '~> 6.2'
+
+  # Apple Sign-In (handled by React Native)
+  # No additional pod needed
+
+  # Push Notifications
+  pod 'RNCPushNotificationIOS', :path => '../node_modules/@react-native-community/push-notification-ios'
+
+  # AsyncStorage
+  pod 'RNCAsyncStorage', :path => '../node_modules/@react-native-async-storage/async-storage'
+
+  # Vector Icons
+  pod 'RNVectorIcons', :path => '../node_modules/react-native-vector-icons'
+
+  # Paper (Material Design)
+  # No additional pod needed for react-native-paper
+
+  # Navigation
+  # No additional pod needed for @react-navigation
+
+  # Permissions
+  pod 'Permission-Camera', :path => "#{permissions_path}/Permission-Camera"
+  pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/Permission-PhotoLibrary"
+  pod 'Permission-Contacts', :path => "#{permissions_path}/Permission-Contacts"
+  pod 'Permission-LocationWhenInUse', :path => "#{permissions_path}/Permission-LocationWhenInUse"
+  pod 'Permission-Notifications', :path => "#{permissions_path}/Permission-Notifications"
+  pod 'Permission-FaceID', :path => "#{permissions_path}/Permission-FaceID"
+
+  # Image Picker
+  pod 'RNImagePicker', :path => '../node_modules/react-native-image-picker'
+
+  # Keychain
+  pod 'RNKeychain', :path => '../node_modules/react-native-keychain'
+
+  # Biometrics
+  pod 'RNBiometrics', :path => '../node_modules/react-native-biometrics'
+
+  # Device Info
+  pod 'RNDeviceInfo', :path => '../node_modules/react-native-device-info'
+
+  # Network Info
+  pod 'RNCNetInfo', :path => '../node_modules/@react-native-community/netinfo'
+
+  # Date Picker
+  pod 'RNDateTimePicker', :path => '../node_modules/@react-native-community/datetimepicker'
+
+  # Slider
+  pod 'RNCSlider', :path => '../node_modules/@react-native-community/slider'
+
+  # Clipboard
+  pod 'RNCClipboard', :path => '../node_modules/@react-native-clipboard/clipboard'
+
+  # Haptic Feedback
+  pod 'RNHapticFeedback', :path => '../node_modules/react-native-haptic-feedback'
+
+  # Safe Area Context
+  pod 'RNSafeAreaContext', :path => '../node_modules/react-native-safe-area-context'
+
+  # Screens
+  pod 'RNScreens', :path => '../node_modules/react-native-screens'
+
+  # Reanimated
+  pod 'RNReanimated', :path => '../node_modules/react-native-reanimated'
+
+  # Gesture Handler
+  pod 'RNGestureHandler', :path => '../node_modules/react-native-gesture-handler'
+
+  # SVG
+  pod 'RNSVG', :path => '../node_modules/react-native-svg'
+
+  # Fast Image
+  pod 'RNFastImage', :path => '../node_modules/react-native-fast-image'
+
+  # Linear Gradient
+  pod 'BVLinearGradient', :path => '../node_modules/react-native-linear-gradient'
+
+  # Blur
+  pod 'RNBlur', :path => '../node_modules/@react-native-community/blur'
+
+  # Modal
+  pod 'RNModal', :path => '../node_modules/react-native-modal'
+
+  # Orientation
+  pod 'RNOrientation', :path => '../node_modules/react-native-orientation-locker'
+
+  # Status Bar
+  pod 'RNStatusBar', :path => '../node_modules/@react-native-community/status-bar'
+
+  # Splash Screen
+  pod 'RNSplashScreen', :path => '../node_modules/react-native-splash-screen'
+
+  target 'BetBuddiesTests' do
+    inherit! :complete
+    # Pods for testing
+  end
+
+  post_install do |installer|
+    react_native_post_install(
+      installer,
+      # Set `mac_catalyst_enabled` to `true` in order to apply patches
+      # necessary for Mac Catalyst builds
+      :mac_catalyst_enabled => false
+    )
+    __apply_Xcode_12_5_M1_post_install_workaround(installer)
+
+    # Fix for Xcode 14
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.4'
+        
+        # Fix for Firebase and other pods
+        if target.name == 'BoringSSL-GRPC'
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= []
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'OPENSSL_NO_ASM=1'
+        end
+        
+        # Fix for React Native 0.71+
+        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+      end
+    end
+  end
+end
+
+def permissions_path
+  '../node_modules/react-native-permissions/ios'
+end

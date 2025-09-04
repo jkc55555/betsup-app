@@ -1,0 +1,149 @@
+name: iOS Build
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+        
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.0'
+        bundler-cache: true
+        
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd ios && pod install --repo-update
+        
+    - name: Cache CocoaPods
+      uses: actions/cache@v3
+      with:
+        path: ios/Pods
+        key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pods-
+          
+    - name: Build iOS (Debug)
+      if: github.ref != 'refs/heads/main'
+      run: |
+        cd ios
+        xcodebuild -workspace BetsUp.xcworkspace \
+          -scheme BetsUp \
+          -configuration Debug \
+          -destination 'platform=iOS Simulator,name=iPhone 14' \
+          -derivedDataPath build \
+          build
+          
+    - name: Build iOS (Release)
+      if: github.ref == 'refs/heads/main'
+      run: |
+        cd ios
+        xcodebuild -workspace BetsUp.xcworkspace \
+          -scheme BetsUp \
+          -configuration Release \
+          -destination 'platform=iOS Simulator,name=iPhone 14' \
+          -derivedDataPath build \
+          build
+          
+    - name: Run iOS tests
+      run: |
+        cd ios
+        xcodebuild test \
+          -workspace BetsUp.xcworkspace \
+          -scheme BetsUp \
+          -destination 'platform=iOS Simulator,name=iPhone 14' \
+          -derivedDataPath build
+          
+  archive:
+    runs-on: macos-latest
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+        
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd ios && pod install --repo-update
+        
+    - name: Import Code-Signing Certificates
+      uses: Apple-Actions/import-codesign-certs@v2
+      with:
+        p12-file-base64: ${{ secrets.IOS_DIST_SIGNING_KEY }}
+        p12-password: ${{ secrets.IOS_DIST_SIGNING_KEY_PASSWORD }}
+        
+    - name: Download Provisioning Profiles
+      uses: Apple-Actions/download-provisioning-profiles@v1
+      with:
+        bundle-id: com.betsup.app
+        issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+        api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+        api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        
+    - name: Archive iOS App
+      run: |
+        cd ios
+        xcodebuild -workspace BetsUp.xcworkspace \
+          -scheme BetsUp \
+          -configuration Release \
+          -archivePath build/BetsUp.xcarchive \
+          archive
+          
+    - name: Export IPA
+      run: |
+        cd ios
+        xcodebuild -exportArchive \
+          -archivePath build/BetsUp.xcarchive \
+          -exportPath build \
+          -exportOptionsPlist ExportOptions.plist
+          
+    - name: Upload to TestFlight
+      if: github.ref == 'refs/heads/develop'
+      uses: Apple-Actions/upload-testflight-build@v1
+      with:
+        app-path: ios/build/BetsUp.ipa
+        issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+        api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+        api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        
+    - name: Upload to App Store
+      if: github.ref == 'refs/heads/main'
+      uses: Apple-Actions/upload-testflight-build@v1
+      with:
+        app-path: ios/build/BetsUp.ipa
+        issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+        api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+        api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}

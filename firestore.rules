@@ -1,0 +1,149 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isBetParticipant(betData) {
+      return request.auth.uid in betData.participants.map(p => p.userId);
+    }
+    
+    function isBetNeutralParty(betData) {
+      return request.auth.uid == betData.neutralParty;
+    }
+    
+    function isBetCreator(betData) {
+      return request.auth.uid == betData.createdBy;
+    }
+    
+    function isGroupMember(groupData) {
+      return request.auth.uid in groupData.members.map(m => m.userId);
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Users can read and write their own profile
+      allow read, write: if isAuthenticated() && isOwner(userId);
+      // Others can read basic profile info (for neutral party selection, etc.)
+      allow read: if isAuthenticated();
+    }
+    
+    // Bets collection
+    match /bets/{betId} {
+      // Read access for participants, neutral party, and creator
+      allow read: if isAuthenticated() && (
+        isBetParticipant(resource.data) ||
+        isBetNeutralParty(resource.data) ||
+        isBetCreator(resource.data)
+      );
+      
+      // Create access for authenticated users
+      allow create: if isAuthenticated() && 
+        isOwner(request.resource.data.createdBy);
+      
+      // Update access for participants, neutral party, and creator
+      allow update: if isAuthenticated() && (
+        isBetParticipant(resource.data) ||
+        isBetNeutralParty(resource.data) ||
+        isBetCreator(resource.data)
+      );
+      
+      // Delete access only for creator (if bet hasn't started)
+      allow delete: if isAuthenticated() && 
+        isBetCreator(resource.data) &&
+        resource.data.status == 'pending';
+    }
+    
+    // Payment requests collection
+    match /paymentRequests/{requestId} {
+      // Read/write access for sender and receiver
+      allow read, write: if isAuthenticated() && (
+        isOwner(resource.data.fromUserId) ||
+        isOwner(resource.data.toUserId)
+      );
+      
+      // Create access for authenticated users
+      allow create: if isAuthenticated() && 
+        isOwner(request.resource.data.fromUserId);
+    }
+    
+    // Groups collection
+    match /groups/{groupId} {
+      // Read access for members
+      allow read: if isAuthenticated() && isGroupMember(resource.data);
+      
+      // Write access for group creator/admin
+      allow write: if isAuthenticated() && (
+        isBetCreator(resource.data) ||
+        // Check if user is admin in members array
+        request.auth.uid in resource.data.members.filter(m => m.role == 'admin').map(m => m.userId)
+      );
+      
+      // Create access for authenticated users
+      allow create: if isAuthenticated() && 
+        isOwner(request.resource.data.createdBy);
+    }
+    
+    // Tabs collection (Premium feature)
+    match /tabs/{tabId} {
+      // Read/write access for participants
+      allow read, write: if isAuthenticated() && 
+        request.auth.uid in resource.data.participants.map(p => p.userId);
+      
+      // Create access for authenticated premium users
+      allow create: if isAuthenticated() && 
+        isOwner(request.resource.data.createdBy);
+    }
+    
+    // Subscriptions collection
+    match /subscriptions/{subscriptionId} {
+      // Users can only read/write their own subscriptions
+      allow read, write: if isAuthenticated() && 
+        isOwner(resource.data.userId);
+      
+      // Create access for authenticated users
+      allow create: if isAuthenticated() && 
+        isOwner(request.resource.data.userId);
+    }
+    
+    // Notifications collection
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated() && 
+        isOwner(resource.data.userId);
+      
+      // System can create notifications
+      allow create: if true; // This would be restricted to server-side in production
+      
+      // Users can update their own notifications (mark as read, etc.)
+      allow update: if isAuthenticated() && 
+        isOwner(resource.data.userId);
+    }
+    
+    // Evidence subcollection under bets
+    match /bets/{betId}/evidence/{evidenceId} {
+      // Same permissions as parent bet
+      allow read, write: if isAuthenticated() && (
+        isBetParticipant(get(/databases/$(database)/documents/bets/$(betId)).data) ||
+        isBetNeutralParty(get(/databases/$(database)/documents/bets/$(betId)).data) ||
+        isBetCreator(get(/databases/$(database)/documents/bets/$(betId)).data)
+      );
+    }
+    
+    // Chat messages subcollection under bets
+    match /bets/{betId}/messages/{messageId} {
+      // Same permissions as parent bet
+      allow read, write: if isAuthenticated() && (
+        isBetParticipant(get(/databases/$(database)/documents/bets/$(betId)).data) ||
+        isBetNeutralParty(get(/databases/$(database)/documents/bets/$(betId)).data) ||
+        isBetCreator(get(/databases/$(database)/documents/bets/$(betId)).data)
+      );
+    }
+  }
+}

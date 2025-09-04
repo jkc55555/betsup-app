@@ -1,0 +1,37 @@
+{
+  "name": "BetsUp",
+  "displayName": "BetsUp!",
+  "version": "1.0.0",
+  "description": "Social betting app for friends",
+  "main": "index.js",
+  "author": "BetsUp Team",
+  "license": "MIT",
+  "homepage": "https://betsup.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/betsup/betsup-app.git"
+  },
+  "bugs": {
+    "url": "https://github.com/betsup/betsup-app/issues"
+  },
+  "keywords": [
+    "betting",
+    "social",
+    "friends",
+    "react-native",
+    "ios",
+    "android"
+  ],
+  "react-native": {
+    "ios": {
+      "bundleIdentifier": "com.betsup.app",
+      "deploymentTarget": "12.4"
+    },
+    "android": {
+      "package": "com.betsup.app",
+      "compileSdkVersion": 33,
+      "targetSdkVersion": 33,
+      "minSdkVersion": 21
+    }
+  }
+}
