@@ -1,0 +1,13 @@
+{
+  "projects": {},
+  "targets": {
+    "betsup-development": {
+      "hosting": {
+        "app": [
+          "betsup-development"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
